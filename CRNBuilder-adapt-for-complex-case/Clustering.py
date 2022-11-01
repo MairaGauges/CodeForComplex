@@ -311,12 +311,22 @@ class Cluster:
 
 class ClusterMap:
 
-    def __init__(self, Ny: int, Nz: int, s: np.array[float], eddy_id: np.array[float], n_clusters, threshold):
+    def __init__(self, Ny: int, Nz: int, s: np.array[float], eddy_id: np.array[float], n_clusters, threshold,filterArray):
         # Save the scalar field inside this object to be accessed by all the clusters
         self.s = s
         self.epsilon = 0.01  # TODO: Add this parameter to the input file
-        # Initialize a grid of one cluster per cell
+        # Initialize a grid of one cluster per cell, if cell is inside domain
         self.clusters = [Cluster(self, i * Nz + j, [i, j]) for i in range(Ny) for j in range(Nz)]
+
+
+        #check which cells are outside of original domain, if so make this cluster empty
+        for cluster in self.clusters: 
+            for cell in cluster.cells:
+                if filterArray[cell[0],cell[1]] == 0:
+                    cluster.empty = True
+
+
+        #does not work if certain clusters are not created --> needs all clusters
         # Set the neighbors of each cluster (theoretically by not connecting clusters from different eddies as each eddy should remain in its own cluster)
         for i in range(Ny):
             for j in range(Nz):
@@ -534,10 +544,10 @@ def get_n_cl_cache(path: str, n_clusters: int):
 def cluster_data_linkage(case_name: str, Ny: int, Nz: int,
                          y: np.array[float], z: np.array[float],
                          s: np.array[float], n_clusters: int,
-                         eddy_id: np.array[int], threshold: float,
+                         eddy_id: np.array[int], threshold: float, filterArray,
                          load_cached: bool = True, save_cache: bool = True,
                          to_cut: bool = False, rework: bool = True) -> np.array[int]:
-    """
+    '''
     Cluster data based on Temperature using a linkage-like algorithm that checks for adjacency of cells to be clustered
     :param case_name: Case name used for caching purposes
     :param Ny: Number of cells along the radial/secondary direction
@@ -553,9 +563,12 @@ def cluster_data_linkage(case_name: str, Ny: int, Nz: int,
     :param to_cut: ...
     :param rework: ...
     :return: 2D numpy array of the id of the cluster to which each cell is assigned
-    """
+
+    '''
+
     print("------------- Linkage clustering -------------")
     print("Starting clustering phase...")
+    
     '''
     # Load cached data if present for the objective number of clusters
     if load_cached and os.path.isfile(os.path.join(f"{os.getcwd()}", f"data", f"{case_name}", f"cache", f"cluster_ids", f"cluster_id_{n_clusters}cl.npy")):
@@ -566,6 +579,7 @@ def cluster_data_linkage(case_name: str, Ny: int, Nz: int,
     print("Cached data not found, generating clusters...")
     print(f"Target number of clusters: {n_clusters}")
     '''
+
     # Normalize the input fields
     threshold -= np.min(s)
     threshold /= (np.max(s) - np.min(s))
@@ -577,7 +591,7 @@ def cluster_data_linkage(case_name: str, Ny: int, Nz: int,
     z = normalize(z)
 
     # Initialize the cluster map that will operate the clustering
-    cluster_map = ClusterMap(Ny, Nz, s, eddy_id, n_clusters, threshold)
+    cluster_map = ClusterMap(Ny, Nz, s, eddy_id, n_clusters, threshold,filterArray)
 
     # Maximum number of iteration to avoid infinite loops
     max_iter = cluster_map.get_cluster_number()
@@ -587,8 +601,11 @@ def cluster_data_linkage(case_name: str, Ny: int, Nz: int,
     print(" [%]    Total number of clusters")
     initial_number = cluster_map.get_cluster_number() + 1
 
+ 
+    '''
 
-    '''# Search for cached data that can be useful in speeding up the algorithm (by providing a starting point with less clusters)
+
+    # Search for cached data that can be useful in speeding up the algorithm (by providing a starting point with less clusters)
     if os.path.isdir(os.path.join(os.getcwd(), f"data", f"{case_name}", f"cache", f"cluster_ids")):
         path = os.path.join(os.getcwd(), f"data", f"{case_name}", f"cache", f"cluster_ids")
         n_cl_cache = get_n_cl_cache(path, n_clusters)
@@ -603,7 +620,11 @@ def cluster_data_linkage(case_name: str, Ny: int, Nz: int,
                 if i == max_iter - 1:
                     raise RuntimeError(f"Could not finish the pre-clustering algorithm within {max_iter} iterations, try changing "
                                        f"max_iter in the function cluster_data_linkage() inside Clustering.py or search for the "
-                                       f"bug that prevents the algorithm from converging.")'''
+                                       f"bug that prevents the algorithm from converging.")
+
+
+    '''
+
 
     # Pre-process the case by merging cells with a Temperature less than T_threshold
     for i in range(max_iter):
@@ -633,16 +654,33 @@ def cluster_data_linkage(case_name: str, Ny: int, Nz: int,
     if rework:
         cluster_map.rework(Ny, Nz)
     print(f"Total time for clustering: {time() - start_time:.2f} s")
+    
+
+
 
     # Create the array of cluster ids and assign to each cell a unique id from 0 to n_clusters
     counter = 0
-    cluster_id = np.empty((Ny, Nz), dtype=int)
+    cluster_id = np.empty(shape = (Ny, Nz))
+
+
+    #make all cells outside domain NaN
+    for i in range(Ny):
+        for j in range(Nz):
+            if filterArray[i,j] == 0:
+                cluster_id[i,j] = None
+
+
+
+
+
     print(f"Clusters data:\n"
           f"     n°    "
           f"  T range  "
           f"   T mean  "
           f"   max T   "
           f"   min T   ")
+
+
     for cluster in cluster_map.clusters:
         if cluster.empty:
             continue
@@ -655,6 +693,7 @@ def cluster_data_linkage(case_name: str, Ny: int, Nz: int,
               f"{cluster.min_s:^11.2f}")
         counter += 1
 
+    '''
     # Save the results in the cache
     if save_cache:
         if not os.path.isdir(os.path.join(f'{os.getcwd()}', f'data', f'{case_name}', f'cache', f'cluster_ids')):
@@ -662,7 +701,12 @@ def cluster_data_linkage(case_name: str, Ny: int, Nz: int,
         print(f"Saving cluster_id as {os.path.join(f'{os.getcwd()}', f'data', f'{case_name}', f'cache', f'cluster_ids', f'cluster_id_{int(np.max(cluster_id) + 1)}cl.npy')} ...")
         np.save(os.path.join(f"{os.getcwd()}", f"data", f"{case_name}", f"cache", f"cluster_ids", f"cluster_id_{int(np.max(cluster_id) + 1)}cl.npy"), cluster_id)
 
-    print(f"Total cluster number: {int(np.max(cluster_id) + 1)}")
+    '''
+
+
+
+    print(f"Total cluster number: {int(np.nanmax(cluster_id) + 1)}")
+
     return cluster_id
 
 

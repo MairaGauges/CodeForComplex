@@ -10,10 +10,6 @@ def detect_eddy(case_name, Ny, Nz, y, z, vy, vz, filterArray,i_min=None, j_min=N
     print("Detecting eddies...")
 
 
-
-
-
-    '''
     if load_cached and not extended_output:
         path = os.path.join(f"{os.getcwd()}", "data", f"{case_name}", "cache", "eddy")
         if os.path.isdir(path):
@@ -91,7 +87,6 @@ def detect_eddy(case_name, Ny, Nz, y, z, vy, vz, filterArray,i_min=None, j_min=N
     print("Applying 3rd constraint...")
     vmin_coords = []
     for i, j in zip(i_o, j_o):
-        print(i,j)
         vmin_coords.append([i, j])
         for u in range(i - b, i + b + 1):
             for v in range(j - b, j + b + 1):
@@ -158,13 +153,8 @@ def detect_eddy(case_name, Ny, Nz, y, z, vy, vz, filterArray,i_min=None, j_min=N
     vmin_coords = [vmin_coords[ii] for ii in range(len(vmin_coords)) if to_keep[ii]]
     print(f"Found {len(vmin_coords)} eddies.")
 
-
-
-
-    '''
-
-
-
+    #vmin_coords = [[32, 8], [7, 8], [186, 76], [162, 276], [141, 426], [33, 443]]
+    #vmin_coords = [[141,426]]
 
 
     # Get actual entire eddy
@@ -174,7 +164,6 @@ def detect_eddy(case_name, Ny, Nz, y, z, vy, vz, filterArray,i_min=None, j_min=N
     eddies_ij = []
 
 
-    vmin_coords = [[32, 8], [7, 8], [186, 76], [162, 276], [141, 426], [33, 443]]
     
 
     for coords in vmin_coords:
@@ -186,25 +175,70 @@ def detect_eddy(case_name, Ny, Nz, y, z, vy, vz, filterArray,i_min=None, j_min=N
         paths_z_temp = []
         paths_i_temp = []
         paths_j_temp = []
-        while closed[-1] or closed[-2] or closed[-3] or closed[-4] or closed[-5] or closed[-6] or closed[-7] or closed[-8] or closed[-9] or closed[-10]:
+        stopped = False
+        #davor bis -11 bzw pop bei 12
+        while closed[-1] or closed[-2] or closed[-3] or closed[-4] or closed[-5] or closed[-6] or closed[-7] or closed[-8] or closed[-9] or closed[-10] or closed[-11] or closed[-12] or closed[-13] or closed[-14] or closed[-15]:
+       
+        #while closed[-1] or closed[-2] or closed[-3] or closed[-4] or closed[-5]:
+
+
+            
+            #if outside of domain do not continue looking for eddy (does this make eddy smaller?)
+            if (j+k)>= Nz or filterArray[i,j+k] == 0: 
+                count = 0
+                print('stopped')
+                print((closed)) 
+                stopped = True
+                for cl in reversed(closed):
+                    if cl: 
+                        break
+                    count += 1  
+                #counter back to 0 if closed loop inbetween ...               
+                num_true = len(paths_y_temp) - count -1
+                for m in range(15-count):
+                    closed.append(False)
+               
+                print('num_true = ' + str(num_true))
+
+                print(len(paths_y_temp)) 
+                
+                paths_y_temp = paths_y_temp[num_true:]
+                paths_i_temp = paths_i_temp[num_true:]
+                paths_z_temp = paths_z_temp[num_true:]
+                paths_j_temp = paths_j_temp[num_true:]
+                #paths_j_temp = paths_j_temp[num_true-3:] 
+                print(len(paths_y_temp))
+ 
+                break 
+
+
+
             path_y, path_z, path_i, path_j, close = simulate_particle(i, j + k, y, z, vy, vz,filterArray)
             closed.append(close)
-            
+
+
             paths_y_temp.append(path_y)
             paths_i_temp.append(path_i)
-            if len(paths_y_temp) > 11:
+            if len(paths_y_temp) > 16:
                 paths_y_temp.pop(0)
                 paths_i_temp.pop(0)
             paths_z_temp.append(path_z)
             paths_j_temp.append(path_j)
-            if len(paths_z_temp) > 11:
+            if len(paths_z_temp) > 16:
                 paths_z_temp.pop(0)
                 paths_j_temp.pop(0)
             k += 1
 
+
+            if stopped:
+                break
+
         print(closed)
         paths_y.append([paths_y_temp[-1]])
         paths_y.append([paths_y_temp[-1]])
+
+
+
 
 
         #paths_z.append([paths_z_temp[0], paths_z_temp[2]])
@@ -212,8 +246,12 @@ def detect_eddy(case_name, Ny, Nz, y, z, vy, vz, filterArray,i_min=None, j_min=N
 
 
         paths_ij.append(zip(paths_i_temp[0], paths_j_temp[0]))
+        
+
         print(f"Filling the eddy number {vmin_coords.index(coords)}...")
         eddies_ij.append(find_enclosed_points(paths_i_temp[0], paths_j_temp[0]))
+        
+
     # Get coordinates from i and j
     #y_o = [y[i, j] for i, j in zip(i_o, j_o)]
     #z_o = [z[i, j] for i, j in zip(i_o, j_o)]
@@ -240,7 +278,7 @@ def detect_eddy(case_name, Ny, Nz, y, z, vy, vz, filterArray,i_min=None, j_min=N
         for e in range(len(eddies_ij)):
             for i, j in eddies_ij[e]:
                 eddy_id[i, j] = e + 1
-        return eddy_id, vmin_coords
+        return eddy_id
     #else:
      #   return y_o, z_o, y_vmin, z_vmin, paths_y, paths_z, paths_ij, eddies_ij
 
@@ -266,7 +304,6 @@ def simulate_particle(i0, j0, y, z, vy, vz, filterArray,dt=1e-5, max_iter=int(1e
     #dt originally 1e-5
     # precision originally 1e-3
     # max iter originalyy 1e5
-    #print(j0)
     y_min = np.nanmin(y)
     y_max = np.nanmax(y)
     z_min = np.nanmin(z)
@@ -368,7 +405,7 @@ def simulate_particle(i0, j0, y, z, vy, vz, filterArray,dt=1e-5, max_iter=int(1e
             index_2 = len(path_i)
 
 
-    #close if hole of 1 or 2 cells --> fill these cells
+    #close if hole of 1 cell --> fill these cells
     #currently connecting to starting point - maybe connect to closest point?
     if not close: 
         if close_1:
@@ -400,12 +437,10 @@ def simulate_particle(i0, j0, y, z, vy, vz, filterArray,dt=1e-5, max_iter=int(1e
         # if sum(abs(np.array(path_y[:-3]) - par_y) <= precision * (np.max(y) - np.min(y))) > 5 and \
         #         sum(abs(np.array(path_z[:-3]) - par_z) <= precision * (np.max(z) - np.min(z))) > 5:
         #     break
-    
     return path_y, path_z, path_i, path_j, close
 
 
 def find_enclosed_points(path_i, path_j):
-    print(list(zip(path_i,path_j))) 
     i_min = min(path_i)
     i_max = max(path_i)
     j_min = min(path_j)

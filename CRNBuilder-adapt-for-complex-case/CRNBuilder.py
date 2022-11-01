@@ -807,7 +807,7 @@ def main():
         print(f"Objective number of reactors: {n_clusters}")
 
     plot_graphs = True
-    case_name = "HM1_bluff-body_flame"
+    case_name = "B4oxy30"
     
     # Read input file
     inlets, outlets, y_lim, z_lim, angle, pressure, radial_dir, axial_dir, T_threshold, dim2 = parse_input(os.path.join(f"{os.getcwd()}", f"data", f"{case_name}", f"CRNB_input.dic"))
@@ -819,9 +819,8 @@ def main():
         boundary_data = post_process_boundary_data(Ny, Nz, y, z, T, vx, vy, vz, rho, boundary_data, inlets, radial_dir, axial_dir)
 
     if dim2:
-        Ny, Nz, y, z, V, vx, vy, vz, T, rho, filterArray = initializeFromVTK(case_name,y_lim,z_lim,axial_dir, radial_dir)
+        Ny, Nz, y, z, V, vx, vy, vz, T, rho, filterArray = initializeFromVTK(case_name,y_lim,z_lim,radial_dir,axial_dir)
         boundary_data = get_boundary_data_dim2(inlets, radial_dir, axial_dir, y_lim, z_lim, T, vx, vy, vz, rho, y, z, Ny, Nz, filterArray)
-
 
 
     # Get eddy data
@@ -829,10 +828,12 @@ def main():
     eddy_id = detect_eddy(case_name, Ny, Nz, y, z, vy, vz, filterArray,load_cached=False, save_cache=False)
 
     # Find clusters
-    cluster_id = cluster_data_linkage(case_name, Ny, Nz, y, z, T, n_clusters, eddy_id, threshold=T_threshold, load_cached=True, save_cache=True, to_cut=False, rework=False)
-    n_clusters = int(np.max(cluster_id) + 1)
-    np.save('clsuter_id',cluster_id)
+    cluster_id = cluster_data_linkage(case_name, Ny, Nz, y, z, T, n_clusters, eddy_id, T_threshold, filterArray,load_cached=True, save_cache=True, to_cut=False, rework=False)
+    n_clusters = int(np.nanmax(cluster_id) + 1)
+    np.save('Cluster.npy',cluster_id)
 
+
+    '''    
     # Get mass flows
     axial_n = get_axial_n(angle)
     my, mz, Ay, Az = get_massflow(y, z, vy, vz, rho, axial_n, y_lim, z_lim, Ny, Nz, boundary_data, radial_dir, axial_dir, inlets,dim2)
@@ -854,6 +855,9 @@ def main():
     # Generate an input.dic file to be used by NetSMOKE
     path = os.path.join(f"{os.getcwd()}", f"data", f"{case_name}")
     generate_input_dic(crn, path, pressure)
+    
+    '''
+
 
     if plot_graphs:
         # Plots

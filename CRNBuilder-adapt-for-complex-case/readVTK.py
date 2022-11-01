@@ -21,10 +21,17 @@ def get_boundary_data_dim2(inlets, radial_dir, axial_dir, y_lim, z_lim, T, vx, v
         cells = []
         cell_list = inlet_cells_[boundary_name]
         num_cells = len(cell_list)
+        
 
         for k in range(num_cells):
-           j  = (cell_list[k] % Ny) -1
-           i = int((cell_list[k] - (j+1))/Ny)
+
+           j = int (cell_list[k] % Nz)
+           i = int ((cell_list[k] - j)/Nz)
+ 
+           
+           #j  = (cell_list[k] % Ny) -1
+           #i = int((cell_list[k] - (j+1))/Ny)
+           print(i,j)
            if filterArray[i,j] == 1:
                cells.append((i,j))
 
@@ -82,8 +89,10 @@ def inlet_cells(inlets, y_lim, z_lim, radial_dir, axial_dir):
             point2[radial_dir] = loc
             point1[axial_dir] = start
             point2[axial_dir] = end
-        
+       
+        print((point1,point2)) 
         cell_list = grid.find_cells_along_line(point1,point2)
+        print(cell_list)
         inlet_cells[inlet_name] = cell_list
     return inlet_cells
 
@@ -99,9 +108,13 @@ def create_grid(z_lim,y_lim,radial_dir, axial_dir):
 
     #decide how to define an appropriate cell size
     #B4oxy30 case
-    stepY = 0.001
-    stepZ = 0.001307
-   
+    #stepY = 0.001
+    #stepZ = 0.001307
+    stepY = 0.002
+    stepZ = 0.005228   
+
+
+
     #HM1 bluff body case 
     #stepY = 0.00015
     #stepZ = 0.0012    
@@ -254,7 +267,6 @@ def initializeFromVTK(case_name,y_lim,z_lim, radial_dir, axial_dir):
     #restructuring data --> switch i and j since the build up array is opposite to the counting of cells with pyvista
     
 
-    '''
     for i in range(Ny):
         for j in range(Nz):
             counter = Nz*i + j
@@ -287,11 +299,10 @@ def initializeFromVTK(case_name,y_lim,z_lim, radial_dir, axial_dir):
                 ri = bounds[2*radial_dir]
                 ro = bounds[2*radial_dir+1]
                 h = bounds[axial_dir*2]-bounds[axial_dir*2 +1]
-                V[i,j] = m.pi*h*(ro**2 - ri**2)'''
+                V[i,j] = m.pi*h*(ro**2 - ri**2)
     
 
-
-    '''     
+    ''' Wrong!
     for j in range(Nz):
         for i in range(Ny):
             counter = Ny*j +i
@@ -330,7 +341,7 @@ def initializeFromVTK(case_name,y_lim,z_lim, radial_dir, axial_dir):
       '''
 
  
-    return Ny, Nz, y, z, V, vx, vy, vz, T, rho, filterArray,interpolated, grid,clipped, sl, VTK, domain
+    return Ny, Nz, y, z, V, vx, vy, vz, T, rho, filterArray
 
 
 
